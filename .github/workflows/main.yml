@@ -1,0 +1,48 @@
+name: Deploy to AWS Lambda
+
+on:
+  push:
+    branches:
+      - main  # or your deployment branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      LAMBDA_FUNCTION_NAME: my-lambda-function  # Or use: ${{ secrets.LAMBDA_FUNCTION_NAME }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Zip source files
+        run: |
+          zip -r function.zip . -x '*.git*' '.github/*' 'tests/*'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name $LAMBDA_FUNCTION_NAME \
+            --zip-file fileb://function.zip \
+            --publish
+
+      - name: Get Lambda Function URL
+        id: lambda_url
+        run: |
+          URL=$(aws lambda get-function-url-config \
+            --function-name $LAMBDA_FUNCTION_NAME \
+            --query 'FunctionUrl' \
+            --output text)
+          echo "FUNCTION_URL=$URL" >> $GITHUB_OUTPUT
+
+      - name: Print Lambda URL
+        run: echo "Lambda Function URL: ${{ steps.lambda_url.outputs.FUNCTION_URL }}"
